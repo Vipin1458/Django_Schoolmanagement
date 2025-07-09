@@ -4,11 +4,13 @@ from .views import (
     RegisterStudentView,
     TeacherListView,
     StudentListView,
-    StudentsByTeacherView
+    StudentsByTeacherView,
+    CustomLoginView
 )
 
 
 urlpatterns = [
+    path('login/', CustomLoginView.as_view(), name='register_teacher'),
     path('register/teacher/', RegisterTeacherView.as_view(), name='register_teacher'),
     path('register/student/', RegisterStudentView.as_view(), name='register_student'),
     path('teachers/', TeacherListView.as_view(), name='teacher_list'),
