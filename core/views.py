@@ -41,6 +41,10 @@ class TeacherListView(generics.ListAPIView):
     serializer_class = TeacherSerializer
     permission_classes = [permissions.AllowAny]
 
+class TeacherDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Teacher.objects.all()
+    serializer_class = TeacherSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 class StudentListView(generics.ListAPIView):
     queryset = Student.objects.all()
@@ -48,6 +52,11 @@ class StudentListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
 
+class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Student.objects.all()
+    serializer_class = StudentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
 class StudentsByTeacherView(generics.ListAPIView):
     serializer_class = StudentSerializer
     permission_classes = [permissions.AllowAny]
