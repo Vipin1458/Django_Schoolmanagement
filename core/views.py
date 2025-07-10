@@ -1,13 +1,14 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, generics, permissions
+from rest_framework import status, generics, permissions, viewsets
 from .serializers import TeacherSerializer, StudentSerializer
 from .models import Teacher, Student
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
+from .permissions import IsAdmin, IsTeacher
 
 class RegisterTeacherView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsAdmin]
 
     def post(self, request):
         serializer = TeacherSerializer(data=request.data)
@@ -22,7 +23,7 @@ class RegisterTeacherView(APIView):
 
 
 class RegisterStudentView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [IsAdmin]
 
     def post(self, request):
         serializer = StudentSerializer(data=request.data)
@@ -36,34 +37,34 @@ class RegisterStudentView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class TeacherListView(generics.ListAPIView):
-    queryset = Teacher.objects.all()
-    serializer_class = TeacherSerializer
-    permission_classes = [permissions.AllowAny]
+# class TeacherListView(generics.ListAPIView):
+#     queryset = Teacher.objects.all()
+#     serializer_class = TeacherSerializer
+#     permission_classes = [IsAdmin]
 
-class TeacherDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Teacher.objects.all()
-    serializer_class = TeacherSerializer
-    permission_classes = [permissions.IsAuthenticated]
+# class TeacherDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = Teacher.objects.all()
+#     serializer_class = TeacherSerializer
+#     permission_classes = [IsAdmin]
 
-class StudentListView(generics.ListAPIView):
-    queryset = Student.objects.all()
-    serializer_class = StudentSerializer
-    permission_classes = [permissions.AllowAny]
+# class StudentListView(generics.ListAPIView):
+#     queryset = Student.objects.all()
+#     serializer_class = StudentSerializer
+#     permission_classes = [IsAdmin]
 
 
-class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Student.objects.all()
-    serializer_class = StudentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+# class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
+#     queryset = Student.objects.all()
+#     serializer_class = StudentSerializer
+#     permission_classes = [IsAdmin]
     
-class StudentsByTeacherView(generics.ListAPIView):
-    serializer_class = StudentSerializer
-    permission_classes = [permissions.AllowAny]
+# class StudentsByTeacherView(generics.ListAPIView):
+#     serializer_class = StudentSerializer
+#     permission_classes = [IsTeacher]
 
-    def get_queryset(self):
-        teacher_id = self.kwargs['teacher_id']
-        return Student.objects.filter(assigned_teacher__id=teacher_id)
+#     def get_queryset(self):
+#         teacher_id = self.kwargs['teacher_id']
+#         return Student.objects.filter(assigned_teacher__id=teacher_id)
     
 class CustomLoginView(APIView):
     permission_classes = []  
@@ -90,3 +91,24 @@ class CustomLoginView(APIView):
             "username": user.username,
             "role": user.role
         }, status=status.HTTP_200_OK)
+
+
+class TeacherViewSet(viewsets.ModelViewSet):
+    queryset = Teacher.objects.all()
+    serializer_class = TeacherSerializer
+    permission_classes = [IsAdmin]
+
+class StudentViewSet(viewsets.ModelViewSet):
+    queryset = Student.objects.all()
+    serializer_class = StudentSerializer
+    permission_classes = [IsAdmin]
+
+class StudentByTeacherViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = StudentSerializer
+    permission_classes = [IsTeacher]
+
+    def get_queryset(self):
+        return Student.objects.filter(assigned_teacher__user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(assigned_teacher=self.request.user.teacher)
