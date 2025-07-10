@@ -7,6 +7,8 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from .permissions import IsAdmin, IsTeacher
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
+
 
 class RegisterTeacherView(APIView):
     permission_classes = [IsAdmin]
@@ -77,12 +79,20 @@ class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     permission_classes = [IsAdmin]
 
-class StudentByTeacherViewSet(viewsets.ReadOnlyModelViewSet):
+# class StudentByTeacherViewSet(viewsets.ReadOnlyModelViewSet):
+class StudentByTeacherViewSet(viewsets.ModelViewSet):    
     serializer_class = StudentSerializer
     permission_classes = [IsTeacher]
 
     def get_queryset(self):
         return Student.objects.filter(assigned_teacher__user=self.request.user)
+    
+    def get_object(self):
+        # Override to ensure teacher can access only their own student
+        obj = super().get_object()
+        if obj.assigned_teacher.user != self.request.user:
+            raise PermissionDenied("You do not have permission to access this student.")
+        return obj
 
     def perform_create(self, serializer):
         serializer.save(assigned_teacher=self.request.user.teacher)

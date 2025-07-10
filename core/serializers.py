@@ -39,6 +39,7 @@ class TeacherSerializer(serializers.ModelSerializer):
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer()
     assigned_teacher = serializers.PrimaryKeyRelatedField(queryset=Teacher.objects.all())
+    warn_assigned_teacher_change = False
 
     class Meta:
         model = Student
@@ -51,3 +52,20 @@ class StudentSerializer(serializers.ModelSerializer):
         user = user_serializer.save()
         student = Student.objects.create(user=user, **validated_data)
         return student
+    
+
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
+        request_user = self.context['request'].user
+
+        if getattr(request_user, "role", "") != "admin" and 'assigned_teacher' in validated_data:
+            validated_data.pop('assigned_teacher')
+            self.warn_assigned_teacher_change = True
+        if user_data:
+            user_serializer = UserSerializer(instance.user, data=user_data, partial=True)
+            user_serializer.is_valid(raise_exception=True)
+            user_serializer.save()
+
+    
+        return super().update(instance, validated_data)
