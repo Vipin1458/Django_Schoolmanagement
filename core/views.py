@@ -1,11 +1,12 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, generics, permissions, viewsets
+from rest_framework import status,viewsets
 from .serializers import TeacherSerializer, StudentSerializer
 from .models import Teacher, Student
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from .permissions import IsAdmin, IsTeacher
+from rest_framework.decorators import action
 
 class RegisterTeacherView(APIView):
     permission_classes = [IsAdmin]
@@ -37,34 +38,7 @@ class RegisterStudentView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# class TeacherListView(generics.ListAPIView):
-#     queryset = Teacher.objects.all()
-#     serializer_class = TeacherSerializer
-#     permission_classes = [IsAdmin]
 
-# class TeacherDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = Teacher.objects.all()
-#     serializer_class = TeacherSerializer
-#     permission_classes = [IsAdmin]
-
-# class StudentListView(generics.ListAPIView):
-#     queryset = Student.objects.all()
-#     serializer_class = StudentSerializer
-#     permission_classes = [IsAdmin]
-
-
-# class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = Student.objects.all()
-#     serializer_class = StudentSerializer
-#     permission_classes = [IsAdmin]
-    
-# class StudentsByTeacherView(generics.ListAPIView):
-#     serializer_class = StudentSerializer
-#     permission_classes = [IsTeacher]
-
-#     def get_queryset(self):
-#         teacher_id = self.kwargs['teacher_id']
-#         return Student.objects.filter(assigned_teacher__id=teacher_id)
     
 class CustomLoginView(APIView):
     permission_classes = []  
@@ -112,3 +86,15 @@ class StudentByTeacherViewSet(viewsets.ReadOnlyModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(assigned_teacher=self.request.user.teacher)
+
+class AdminTeacherViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Teacher.objects.all()
+    serializer_class = TeacherSerializer
+    permission_classes = [IsAdmin]
+
+    @action(detail=True, methods=['get'], url_path='students')
+    def get_students(self, request, pk=None):
+        teacher = self.get_object()
+        students = Student.objects.filter(assigned_teacher=teacher)
+        serializer = StudentSerializer(students, many=True)
+        return Response(serializer.data)
