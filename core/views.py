@@ -5,6 +5,7 @@ from .serializers import TeacherSerializer, StudentSerializer
 from .models import Teacher, Student
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth import authenticate
 from .permissions import IsAdmin, IsTeacher,IsAdminOrSelf
 from rest_framework.decorators import action
@@ -193,6 +194,9 @@ class TeacherSelfUpdateView(RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user.teacher
     
+
+@api_view(['GET'])
+@permission_classes([IsAdmin]) 
 def export_students_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="students.csv"'
@@ -204,7 +208,8 @@ def export_students_csv(request):
         writer.writerow([student.id, student.user.username, student.grade, student.phone_number])
 
     return response
-
+@api_view(['GET'])
+@permission_classes([IsAdmin])  
 def export_teachers_csv(request):
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="teachers.csv"'
