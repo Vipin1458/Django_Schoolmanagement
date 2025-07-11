@@ -20,10 +20,10 @@ router.register(r'mystudents', StudentByTeacherViewSet, basename='teacher-studen
 router.register(r'teacher-admin', AdminTeacherViewSet, basename='admin-teacher')
 
 urlpatterns = [
-    path('login/', CustomLoginView.as_view(), name='custom_login'),
-    path('teacher/me/', TeacherSelfUpdateView.as_view(), name='teacher_self_update'),
-    path('export/students/', export_students_csv, name='export_students'),
-    path('export/teachers/', export_teachers_csv, name='export_teachers'),
+    path('login', CustomLoginView.as_view(), name='custom_login'),
+    path('teacher/me', TeacherSelfUpdateView.as_view(), name='teacher_self_update'),
+    path('export/students', export_students_csv, name='export_students_csv'),
+    path('export/teachers', export_teachers_csv, name='export_teachers_csv'),
 
 
     # path('register/teacher/', RegisterTeacherView.as_view(), name='register_teacher'),

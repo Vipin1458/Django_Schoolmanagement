@@ -4,8 +4,9 @@ from rest_framework import status,viewsets
 from .serializers import TeacherSerializer, StudentSerializer
 from .models import Teacher, Student
 from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate
-from .permissions import IsAdmin, IsTeacher
+from .permissions import IsAdmin, IsTeacher,IsAdminOrSelf
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +14,8 @@ from rest_framework.generics import RetrieveUpdateAPIView
 import csv
 from django.http import HttpResponse
 from .serializers import TeacherSelfUpdateSerializer
+import logging
+
 
 
 
@@ -46,7 +49,7 @@ from .serializers import TeacherSelfUpdateSerializer
 #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
+logger = logging.getLogger(__name__)
     
 class CustomLoginView(APIView):
     permission_classes = []  
@@ -54,7 +57,7 @@ class CustomLoginView(APIView):
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
-
+        logger.info(f"Login attempt for username: {username}")
         if not username or not password:
             return Response({"error": "Please provide both username and password."},
                             status=status.HTTP_400_BAD_REQUEST)
@@ -62,9 +65,10 @@ class CustomLoginView(APIView):
         user = authenticate(username=username, password=password)
 
         if not user:
+            logger.error(f"Invalid login for username: {username}")
             return Response({"error": "Invalid credentials."},
                             status=status.HTTP_401_UNAUTHORIZED)
-
+        logger.info(f"Login successful for user: {user.username}")
         token, created = Token.objects.get_or_create(user=user)
 
         return Response({
@@ -75,15 +79,66 @@ class CustomLoginView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+
+
 class TeacherViewSet(viewsets.ModelViewSet):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAuthenticated, IsAdminOrSelf]  # Update here
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return Teacher.objects.all()
+        elif user.role == 'teacher':
+            return Teacher.objects.filter(user=user)
+        return Teacher.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        logger.info(f"[ADMIN:{request.user.username}] Creating a new teacher")
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        teacher = self.get_object()
+        logger.info(f"[{request.user.role.upper()}:{request.user.username}] Updating teacher ID {teacher.id}")
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        teacher = self.get_object()
+        logger.warning(f"[{request.user.role.upper()}:{request.user.username}] Deleting teacher ID {teacher.id}")
+        return super().destroy(request, *args, **kwargs)
+
 
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
-    permission_classes = [IsAdmin]
+    permission_classes = [IsAuthenticated, IsAdminOrSelf]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'admin':
+            return Student.objects.all()
+        elif user.role == 'student':
+            return Student.objects.filter(user=user)
+        elif user.role == 'teacher':
+            return Student.objects.filter(assigned_teacher__user=user)
+        return Student.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        logger.info(f"[ADMIN:{request.user.username}] Creating a new student")
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        student = self.get_object()
+        logger.info(f"[ADMIN:{request.user.username}] Updating student ID {student.id}")
+        logger.debug(f"Update data: {request.data}")
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        student = self.get_object()
+        logger.warning(f"[ADMIN:{request.user.username}] Deleting student ID {student.id}")
+        return super().destroy(request, *args, **kwargs)
+  
 
 # class StudentByTeacherViewSet(viewsets.ReadOnlyModelViewSet):
 class StudentByTeacherViewSet(viewsets.ModelViewSet):    
@@ -94,7 +149,6 @@ class StudentByTeacherViewSet(viewsets.ModelViewSet):
         return Student.objects.filter(assigned_teacher__user=self.request.user)
     
     def get_object(self):
-        # Override to ensure teacher can access only their own student
         obj = super().get_object()
         if obj.assigned_teacher.user != self.request.user:
             raise PermissionDenied("You do not have permission to access this student.")
@@ -109,7 +163,7 @@ class StudentByTeacherViewSet(viewsets.ModelViewSet):
         self.perform_update(serializer)
 
         response_data = serializer.data
-        # Add warning flag to response if applicable
+        
         if getattr(serializer, 'warn_assigned_teacher_change', False):
             response_data['warning'] = "Assigned teacher can only be changed by admin."
 
