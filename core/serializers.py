@@ -69,3 +69,27 @@ class StudentSerializer(serializers.ModelSerializer):
 
     
         return super().update(instance, validated_data)
+    
+class TeacherSelfUpdateSerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+
+    class Meta:
+        model = Teacher
+        fields = ['user', 'phone_number']  # Only these fields are updatable
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+        user = instance.user
+
+        # Only allow username and email to be updated
+        for field in ['email']:
+            if field in user_data:
+                setattr(user, field, user_data[field])
+        user.save()
+
+        # Update phone number
+        if 'phone_number' in validated_data:
+            instance.phone_number = validated_data['phone_number']
+            instance.save()
+
+        return instance

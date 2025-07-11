@@ -1,13 +1,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    RegisterTeacherView,
-    RegisterStudentView,
+    # RegisterTeacherView,
+    # RegisterStudentView,
     TeacherViewSet,
     StudentViewSet,
     StudentByTeacherViewSet,
     CustomLoginView,
-    AdminTeacherViewSet
+    AdminTeacherViewSet,
+    TeacherSelfUpdateView
 )
 
 router = DefaultRouter()
@@ -18,7 +19,9 @@ router.register(r'teacher-admin', AdminTeacherViewSet, basename='admin-teacher')
 
 urlpatterns = [
     path('login/', CustomLoginView.as_view(), name='custom_login'),
-    path('register/teacher/', RegisterTeacherView.as_view(), name='register_teacher'),
-    path('register/student/', RegisterStudentView.as_view(), name='register_student'),
+    path('teacher/me/', TeacherSelfUpdateView.as_view(), name='teacher_self_update'),
+
+    # path('register/teacher/', RegisterTeacherView.as_view(), name='register_teacher'),
+    # path('register/student/', RegisterStudentView.as_view(), name='register_student'),
     path('', include(router.urls)),
 ]

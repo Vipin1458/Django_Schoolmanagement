@@ -8,36 +8,40 @@ from django.contrib.auth import authenticate
 from .permissions import IsAdmin, IsTeacher
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import RetrieveUpdateAPIView
+from .serializers import TeacherSelfUpdateSerializer
 
 
-class RegisterTeacherView(APIView):
-    permission_classes = [IsAdmin]
 
-    def post(self, request):
-        serializer = TeacherSerializer(data=request.data)
-        if serializer.is_valid():
-            teacher = serializer.save()
-            return Response({
-                "message": "Teacher registered successfully.",
-                "teacher_id": teacher.id,
-                "user_id": teacher.user.id
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# class RegisterTeacherView(APIView):
+#     permission_classes = [IsAdmin]
+
+#     def post(self, request):
+#         serializer = TeacherSerializer(data=request.data)
+#         if serializer.is_valid():
+#             teacher = serializer.save()
+#             return Response({
+#                 "message": "Teacher registered successfully.",
+#                 "teacher_id": teacher.id,
+#                 "user_id": teacher.user.id
+#             }, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class RegisterStudentView(APIView):
-    permission_classes = [IsAdmin]
+# class RegisterStudentView(APIView):
+#     permission_classes = [IsAdmin]
 
-    def post(self, request):
-        serializer = StudentSerializer(data=request.data)
-        if serializer.is_valid():
-            student = serializer.save()
-            return Response({
-                "message": "Student registered successfully.",
-                "student_id": student.id,
-                "user_id": student.user.id
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#     def post(self, request):
+#         serializer = StudentSerializer(data=request.data)
+#         if serializer.is_valid():
+#             student = serializer.save()
+#             return Response({
+#                 "message": "Student registered successfully.",
+#                 "student_id": student.id,
+#                 "user_id": student.user.id
+#             }, status=status.HTTP_201_CREATED)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -94,6 +98,22 @@ class StudentByTeacherViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You do not have permission to access this student.")
         return obj
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        response_data = serializer.data
+        # Add warning flag to response if applicable
+        if getattr(serializer, 'warn_assigned_teacher_change', False):
+            response_data['warning'] = "Assigned teacher can only be changed by admin."
+
+        return Response(response_data)
+
+
     def perform_create(self, serializer):
         serializer.save(assigned_teacher=self.request.user.teacher)
 
@@ -108,3 +128,11 @@ class AdminTeacherViewSet(viewsets.ReadOnlyModelViewSet):
         students = Student.objects.filter(assigned_teacher=teacher)
         serializer = StudentSerializer(students, many=True)
         return Response(serializer.data)
+    
+
+class TeacherSelfUpdateView(RetrieveUpdateAPIView):
+    serializer_class = TeacherSelfUpdateSerializer
+    permission_classes = [IsAuthenticated, IsTeacher]
+
+    def get_object(self):
+        return self.request.user.teacher
