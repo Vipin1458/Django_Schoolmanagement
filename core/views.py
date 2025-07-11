@@ -10,6 +10,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView
+import csv
+from django.http import HttpResponse
 from .serializers import TeacherSelfUpdateSerializer
 
 
@@ -136,3 +138,27 @@ class TeacherSelfUpdateView(RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user.teacher
+    
+def export_students_csv(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="students.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['ID', 'Username', 'Grade', 'Phone'])
+
+    for student in Student.objects.select_related('user'):
+        writer.writerow([student.id, student.user.username, student.grade, student.phone_number])
+
+    return response
+
+def export_teachers_csv(request):
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="teachers.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['ID', 'Username', 'Specialization', 'Phone'])
+
+    for teacher in Teacher.objects.select_related('user'):
+        writer.writerow([teacher.id, teacher.user.username, teacher.subject_specialization, teacher.phone_number])
+
+    return response
