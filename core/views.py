@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status,viewsets
+from rest_framework.parsers import MultiPartParser  
+from rest_framework import status,viewsets,permissions
 from .serializers import TeacherSerializer, StudentSerializer
 from .models import Teacher, Student
 from rest_framework.authtoken.models import Token
@@ -12,7 +13,14 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView
+from rest_framework.decorators import parser_classes
+from django.utils import timezone
+from .models import Exam, Question, StudentExam, StudentAnswer
+from .serializers import ExamSerializer
+from django.contrib.auth import get_user_model
+from datetime import datetime
 import csv
+import io
 from django.http import HttpResponse
 from .serializers import TeacherSelfUpdateSerializer
 import logging
@@ -221,3 +229,118 @@ def export_teachers_csv(request):
         writer.writerow([teacher.id, teacher.user.username, teacher.subject_specialization, teacher.phone_number])
 
     return response
+
+
+User = get_user_model()
+
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+@parser_classes([MultiPartParser])
+def import_students_csv(request):
+    csv_file = request.FILES.get('file')
+    if not csv_file:
+        return Response({"error": "CSV file is missing."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not csv_file.name.endswith('.csv'):
+        return Response({"error": "Only CSV files are accepted."}, status=status.HTTP_400_BAD_REQUEST)
+
+    decoded_file = csv_file.read().decode('utf-8')
+    io_string = io.StringIO(decoded_file)
+    reader = csv.DictReader(io_string)
+
+    created_count = 0
+    for row in reader:
+        try:
+            user = User.objects.create_user(
+                username=row['username'],
+                email=row['email'],
+                password="default123",
+                role='student'
+            )
+
+            student = Student.objects.create(
+                user=user,
+                roll_number=row['roll_number'],  
+                phone_number=row['phone_number'],
+                grade=row['grade'],
+                date_of_birth=datetime.strptime(row['date_of_birth'], '%Y-%m-%d').date(),
+                admission_date=datetime.strptime(row['admission_date'], '%Y-%m-%d').date(),
+                assigned_teacher=Teacher.objects.get(pk=row['assigned_teacher_id']),
+                status=0
+            )
+
+            created_count += 1
+
+        except Exception as e:
+            return Response({"error": f"Error processing row {row}: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({"message": f"Successfully imported {created_count} students."}, status=status.HTTP_201_CREATED)
+
+
+class ExamViewSet(viewsets.ModelViewSet):
+    queryset = Exam.objects.all()
+    serializer_class = ExamSerializer
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role == 'teacher':
+            # Teacher creates an exam, auto-assign themselves
+            teacher = Teacher.objects.get(user=user)
+            serializer.save(created_by=user, assigned_teacher=teacher)
+        elif user.role == 'admin':
+            # Admin must explicitly assign a teacher
+            serializer.save(created_by=user)
+        else:
+            raise PermissionError("Only teachers or admins can create exams.")
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated and user.role == 'teacher':
+            teacher = Teacher.objects.get(user=user)
+            return Exam.objects.filter(assigned_teacher=teacher)
+        return Exam.objects.all()
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def attend(self, request, pk=None):
+        exam = self.get_object()
+        student = Student.objects.get(user=request.user)
+
+        # Check if already attended
+        if StudentExam.objects.filter(student=student, exam=exam).exists():
+            return Response({"detail": "You have already attended this exam."}, status=400)
+
+        # Get submitted answers
+        answers_data = request.data.get("answers", [])
+        student_exam = StudentExam.objects.create(student=student, exam=exam)
+
+        correct = 0
+        for ans in answers_data:
+            question_id = ans.get("question_id")
+            answer = ans.get("answer")
+            question = exam.questions.get(id=question_id)
+            is_correct = question.correct_answer.strip().lower() == answer.strip().lower()
+            if is_correct:
+                correct += 1
+            StudentAnswer.objects.create(
+                student_exam=student_exam,
+                question=question,
+                answer=answer,
+                is_correct=is_correct
+            )
+
+        student_exam.marks = correct
+        student_exam.save()
+
+        return Response({"message": f"Submitted successfully. You scored {correct}/5."})
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def my_marks(self, request):
+        student = Student.objects.get(user=request.user)
+        exams = StudentExam.objects.filter(student=student)
+        serializer = StudentExamSerializer(exams, many=True)
+        return Response(serializer.data)
