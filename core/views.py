@@ -16,7 +16,7 @@ from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.decorators import parser_classes
 from django.utils import timezone
 from .models import Exam, Question, StudentExam, StudentAnswer
-from .serializers import ExamSerializer
+from .serializers import ExamSerializer,ExamSubmissionSerializer,StudentExamSerializer,QuestionSerializer
 from django.contrib.auth import get_user_model
 from datetime import datetime
 import csv
@@ -289,11 +289,9 @@ class ExamViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         if user.role == 'teacher':
-            # Teacher creates an exam, auto-assign themselves
             teacher = Teacher.objects.get(user=user)
-            serializer.save(created_by=user, assigned_teacher=teacher)
+            serializer.save(created_by=user, teacher=teacher)
         elif user.role == 'admin':
-            # Admin must explicitly assign a teacher
             serializer.save(created_by=user)
         else:
             raise PermissionError("Only teachers or admins can create exams.")
@@ -302,41 +300,26 @@ class ExamViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_authenticated and user.role == 'teacher':
             teacher = Teacher.objects.get(user=user)
-            return Exam.objects.filter(assigned_teacher=teacher)
+            return Exam.objects.filter(teacher=teacher)
         return Exam.objects.all()
 
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def questions(self, request, pk=None):
+        exam = self.get_object()
+        questions = exam.questions.all()
+        serializer = QuestionSerializer(questions, many=True)
+        return Response(serializer.data)
+   
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def attend(self, request, pk=None):
         exam = self.get_object()
-        student = Student.objects.get(user=request.user)
+        serializer = ExamSubmissionSerializer(data=request.data, context={'request': request, 'exam': exam})
+        serializer.is_valid(raise_exception=True)
+        submission = serializer.save()
 
-        # Check if already attended
-        if StudentExam.objects.filter(student=student, exam=exam).exists():
-            return Response({"detail": "You have already attended this exam."}, status=400)
-
-        # Get submitted answers
-        answers_data = request.data.get("answers", [])
-        student_exam = StudentExam.objects.create(student=student, exam=exam)
-
-        correct = 0
-        for ans in answers_data:
-            question_id = ans.get("question_id")
-            answer = ans.get("answer")
-            question = exam.questions.get(id=question_id)
-            is_correct = question.correct_answer.strip().lower() == answer.strip().lower()
-            if is_correct:
-                correct += 1
-            StudentAnswer.objects.create(
-                student_exam=student_exam,
-                question=question,
-                answer=answer,
-                is_correct=is_correct
-            )
-
-        student_exam.marks = correct
-        student_exam.save()
-
-        return Response({"message": f"Submitted successfully. You scored {correct}/5."})
+        return Response({
+            "message": f"Submitted successfully. You scored {submission.marks}/5."
+        })
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def my_marks(self, request):

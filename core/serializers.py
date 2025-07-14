@@ -1,9 +1,8 @@
 from rest_framework import serializers
-
 # from rest_framework.exceptions import ValidationError
 from django.contrib.auth.hashers import make_password
-from core.models import Exam, Question, ExamSubmission, Answer, Teacher,StudentExam, StudentAnswer
-from .models import User, Teacher,Student
+from core.models import Exam, Question, Teacher
+from .models import User, Teacher,Student,StudentExam, StudentAnswer
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -95,6 +94,7 @@ class QuestionSerializer(serializers.ModelSerializer):
             'id', 'question_text', 'option1', 'option2', 'option3', 'option4', 'correct_option'
         ]
 
+
 class ExamSerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, write_only=True)
     teacher = serializers.PrimaryKeyRelatedField(queryset=Teacher.objects.all(), required=False)
@@ -107,12 +107,13 @@ class ExamSerializer(serializers.ModelSerializer):
         questions_data = validated_data.pop('questions')
         request_user = self.context['request'].user
 
-        # If a teacher is creating, assign automatically
+        if len(questions_data) != 5:
+            raise serializers.ValidationError("Each exam must contain exactly 5 questions.")
+
         if request_user.role == 'teacher':
             teacher = Teacher.objects.get(user=request_user)
             validated_data['teacher'] = teacher
 
-        # Admin must explicitly provide a teacher
         validated_data['created_by'] = request_user
         exam = Exam.objects.create(**validated_data)
 
@@ -120,35 +121,74 @@ class ExamSerializer(serializers.ModelSerializer):
             Question.objects.create(exam=exam, **q)
 
         return exam
-    
 
-class AnswerSerializer(serializers.ModelSerializer):
+
+# Serializer for a single submitted answer
+class ExamSubmissionAnswerSerializer(serializers.Serializer):
+    question_id = serializers.IntegerField()
+    answer = serializers.CharField()
+
+
+
+class StudentAnswerSerializer(serializers.ModelSerializer):
+    question_text = serializers.CharField(source='question.question_text', read_only=True)
+
     class Meta:
-        model = Answer
-        fields = ['question', 'selected_option']
+        model = StudentAnswer
+        fields = ['id', 'question', 'question_text', 'answer', 'is_correct']
 
-class ExamSubmissionSerializer(serializers.ModelSerializer):
-    answers = AnswerSerializer(many=True, write_only=True)
-    score = serializers.IntegerField(read_only=True)
+class StudentExamSerializer(serializers.ModelSerializer):
+    exam_title = serializers.CharField(source='exam.title', read_only=True)
+    answers = StudentAnswerSerializer(many=True, read_only=True, source='studentanswer_set')
 
     class Meta:
-        model = ExamSubmission
-        fields = ['id', 'exam', 'answers', 'score']
+        model = StudentExam
+        fields = ['id', 'exam', 'exam_title', 'marks', 'submitted_at', 'answers']
+
+class ExamSubmissionSerializer(serializers.Serializer):
+    answers = ExamSubmissionAnswerSerializer(many=True)
+
+    def validate_answers(self, value):
+        if len(value) != 5:
+            raise serializers.ValidationError("You must answer exactly 5 questions.")
+        return value
 
     def create(self, validated_data):
-        answers_data = validated_data.pop('answers')
-        student = Student.objects.get(user=self.context['request'].user)
-        submission = ExamSubmission.objects.create(student=student, **validated_data)
+        request = self.context['request']
+        user = request.user
+        exam = self.context['exam']
+        student = Student.objects.get(user=user)
 
+        # Check if already submitted
+        if StudentExam.objects.filter(student=student, exam=exam).exists():
+            raise serializers.ValidationError("You have already submitted this exam.")
+
+        # Create the exam attempt
+        student_exam = StudentExam.objects.create(student=student, exam=exam)
         score = 0
-        for answer_data in answers_data:
-            question = answer_data['question']
-            selected_option = answer_data['selected_option']
-            Answer.objects.create(submission=submission, question=question, selected_option=selected_option)
 
-            if question.correct_option == selected_option:
+        for ans in validated_data['answers']:
+            question_id = ans.get('question_id')
+            answer = ans.get('answer')
+
+            try:
+                question = Question.objects.get(id=question_id, exam=exam)
+            except Question.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"Question ID {question_id} does not belong to this exam."
+                )
+
+            is_correct = question.correct_option.strip().lower() == answer.strip().lower()
+            if is_correct:
                 score += 1
 
-        submission.score = score
-        submission.save()
-        return submission
+            StudentAnswer.objects.create(
+                student_exam=student_exam,
+                question=question,
+                answer=answer,
+                is_correct=is_correct
+            )
+
+        student_exam.marks = score
+        student_exam.save()
+        return student_exam

@@ -56,30 +56,30 @@ class Question(models.Model):
     option2 = models.CharField(max_length=255)
     option3 = models.CharField(max_length=255)
     option4 = models.CharField(max_length=255)
-    correct_option = models.IntegerField(choices=[(1, 'Option1'), (2, 'Option2'), (3, 'Option3'), (4, 'Option4')])
+    CORRECT_OPTION_CHOICES = [
+        ("1", "Option 1"),
+        ("2", "Option 2"),
+        ("3", "Option 3"),
+        ("4", "Option 4"),
+    ]
+
+    correct_option = models.CharField(
+        max_length=1,
+        choices=CORRECT_OPTION_CHOICES,
+        help_text="Enter the correct option number (1-4)"
+    )
 
     def __str__(self):
-        return f"Question for {self.exam.title}"
+        return self.question_text
 
-class ExamSubmission(models.Model):
-    student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    score = models.IntegerField(default=0)
 
-    def __str__(self):
-        return f"{self.student.user.username} - {self.exam.title}"
-
-class Answer(models.Model):
-    submission = models.ForeignKey(ExamSubmission, related_name='answers', on_delete=models.CASCADE)
-    question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    selected_option = models.IntegerField(choices=[(1, 'Option1'), (2, 'Option2'), (3, 'Option3'), (4, 'Option4')])
 
 class StudentExam(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
     marks = models.IntegerField(default=0)
     attempted_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ('student', 'exam')
