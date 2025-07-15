@@ -123,7 +123,7 @@ class ExamSerializer(serializers.ModelSerializer):
         return exam
 
 
-# Serializer for a single submitted answer
+
 class ExamSubmissionAnswerSerializer(serializers.Serializer):
     question_id = serializers.IntegerField()
     answer = serializers.CharField()
@@ -135,15 +135,15 @@ class StudentAnswerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentAnswer
-        fields = ['id', 'question', 'question_text', 'answer', 'is_correct']
+        fields = ['id', 'question', 'question_text','answer', 'is_correct']
 
 class StudentExamSerializer(serializers.ModelSerializer):
     exam_title = serializers.CharField(source='exam.title', read_only=True)
-    answers = StudentAnswerSerializer(many=True, read_only=True, source='studentanswer_set')
-
+    answers = StudentAnswerSerializer(many=True, read_only=True) 
+    student_name = serializers.CharField(source='student.user.username', read_only=True)
     class Meta:
         model = StudentExam
-        fields = ['id', 'exam', 'exam_title', 'marks', 'submitted_at', 'answers']
+        fields = ['id', 'exam', 'exam_title', 'marks','student_name',  'submitted_at', 'answers']
 
 class ExamSubmissionSerializer(serializers.Serializer):
     answers = ExamSubmissionAnswerSerializer(many=True)
@@ -159,11 +159,11 @@ class ExamSubmissionSerializer(serializers.Serializer):
         exam = self.context['exam']
         student = Student.objects.get(user=user)
 
-        # Check if already submitted
+        
         if StudentExam.objects.filter(student=student, exam=exam).exists():
             raise serializers.ValidationError("You have already submitted this exam.")
 
-        # Create the exam attempt
+      
         student_exam = StudentExam.objects.create(student=student, exam=exam)
         score = 0
 
@@ -178,7 +178,9 @@ class ExamSubmissionSerializer(serializers.Serializer):
                     f"Question ID {question_id} does not belong to this exam."
                 )
 
-            is_correct = question.correct_option.strip().lower() == answer.strip().lower()
+            correct_answer = getattr(question, f"option{question.correct_option}")
+            is_correct = question.correct_option == answer   
+
             if is_correct:
                 score += 1
 

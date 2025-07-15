@@ -105,3 +105,28 @@ class ViewTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response['Content-Type'], 'text/csv')
         self.assertIn('teacher1', response.content.decode())
+
+
+    def test_unauthenticated_user_cannot_list_teachers(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get(reverse('teacher-list'))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_admin_can_retrieve_student(self):
+        url = reverse('student-detail', kwargs={'pk': self.student.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['user']['username'], 'student1')
+
+    def test_teacher_cannot_list_all_teachers(self):
+        self.client.force_authenticate(user=self.teacher_user)
+        response = self.client.get(reverse('teacher-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+
+    def test_student_cannot_list_teachers(self):
+        self.client.force_authenticate(user=self.student_user)
+        response = self.client.get(reverse('teacher-list'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 0)
+

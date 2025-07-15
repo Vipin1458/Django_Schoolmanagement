@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser  
-from rest_framework import status,viewsets,permissions
+from rest_framework import status,viewsets,permissions,generics
 from .serializers import TeacherSerializer, StudentSerializer
 from .models import Teacher, Student
 from rest_framework.authtoken.models import Token
@@ -327,3 +327,33 @@ class ExamViewSet(viewsets.ModelViewSet):
         exams = StudentExam.objects.filter(student=student)
         serializer = StudentExamSerializer(exams, many=True)
         return Response(serializer.data)
+    
+
+class StudentExamListView(generics.ListAPIView):
+    serializer_class = StudentExamSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if user.role == 'admin':
+            return StudentExam.objects.all()
+        
+        elif user.role == 'teacher':
+            teacher = user.teacher  # Assuming one-to-one with Teacher model
+            return StudentExam.objects.filter(student__assigned_teacher=teacher)
+        
+        return StudentExam.objects.none()
+    
+    def get_queryset(self):
+        user = self.request.user
+        queryset = StudentExam.objects.all()
+
+        if user.role == 'teacher':
+            queryset = queryset.filter(student__assigned_teacher__user=user)
+
+        exam_id = self.request.query_params.get('exam_id')
+        if exam_id:
+            queryset = queryset.filter(exam__id=exam_id)
+
+        return queryset

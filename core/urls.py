@@ -13,7 +13,8 @@ from .views import (
     export_students_csv,
     export_teachers_csv,
     import_students_csv,
-    ExamViewSet
+    ExamViewSet,
+    StudentExamListView
 )
 
 router = DefaultRouter()
@@ -32,6 +33,7 @@ urlpatterns = [
     path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+    path('api/student-marks/', StudentExamListView.as_view(), name='student-exam-marks'),
     # path('register/teacher/', RegisterTeacherView.as_view(), name='register_teacher'),
     # path('register/student/', RegisterStudentView.as_view(), name='register_student'),
     path('', include(router.urls)),
