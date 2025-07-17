@@ -3,6 +3,17 @@ from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
 from core.models import Exam, Question, Teacher
 from .models import User, Teacher,Student,StudentExam, StudentAnswer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['username'] = user.username
+        token['role'] = user.role
+
+        return token
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,6 +45,22 @@ class TeacherSerializer(serializers.ModelSerializer):
         user = user_serializer.save()
         teacher = Teacher.objects.create(user=user, **validated_data)
         return teacher
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
+
+       
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        
+        if user_data:
+            user = instance.user
+            for attr, value in user_data.items():
+                setattr(user, attr, value)
+            user.save()
+
+        return instance
     
 class StudentSerializer(serializers.ModelSerializer):
     user = UserSerializer()

@@ -93,10 +93,18 @@ class CustomLoginView(APIView):
 class TeacherViewSet(viewsets.ModelViewSet):
     queryset = Teacher.objects.all()
     serializer_class = TeacherSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrSelf]  # Update here
+    permission_classes = [IsAuthenticated]  
 
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsAdmin()]
+        elif self.action in ['retrieve']:
+            return [IsAuthenticated(), IsAdminOrSelf()]
+        return [IsAuthenticated(), IsAdmin()]
     def get_queryset(self):
         user = self.request.user
+        print(user.role)
         if user.role == 'admin':
             return Teacher.objects.all()
         elif user.role == 'teacher':
