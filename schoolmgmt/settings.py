@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'corsheaders',
 ]
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),  # ⬅️ change this to desired duration
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=5),  # ⬅️ change this to desired duration
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
     'BLACKLIST_AFTER_ROTATION': True,

@@ -14,7 +14,9 @@ from .views import (
     export_teachers_csv,
     import_students_csv,
     ExamViewSet,
-    StudentExamListView
+    StudentExamListView,
+    CustomPasswordResetView,
+    CustomPasswordResetConfirmView
 )
 
 router = DefaultRouter()
@@ -34,6 +36,8 @@ urlpatterns = [
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
     path('api/student-marks/', StudentExamListView.as_view(), name='student-exam-marks'),
+     path('api/password-reset/', CustomPasswordResetView.as_view(), name='password_reset'),
+    path('api/password-reset-confirm/<uidb64>/<token>/', CustomPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     # path('register/teacher/', RegisterTeacherView.as_view(), name='register_teacher'),
     # path('register/student/', RegisterStudentView.as_view(), name='register_student'),
     path('', include(router.urls)),

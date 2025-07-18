@@ -29,7 +29,22 @@ class UserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'password': 'This field is required.'})
         validated_data['password'] = make_password(password)
         return super().create(validated_data)
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
 
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+      
+        if user_data:
+            user = instance.user
+            for attr, value in user_data.items():
+                setattr(user, attr, value)
+            user.save()
+
+        return instance
 
 class TeacherSerializer(serializers.ModelSerializer):
     user = UserSerializer()
@@ -122,13 +137,32 @@ class QuestionSerializer(serializers.ModelSerializer):
         ]
 
 
+class UserMiniSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username']
+
+class TeacherMiniSerializer(serializers.ModelSerializer):
+    user = UserMiniSerializer(read_only=True)
+
+    class Meta:
+        model = Teacher
+        fields = ['id', 'user']
+
 class ExamSerializer(serializers.ModelSerializer):
+    teacher = TeacherMiniSerializer(read_only=True)
+    teacher_id = serializers.PrimaryKeyRelatedField(
+        queryset=Teacher.objects.all(),
+        source='teacher',
+        write_only=True,
+        required=False
+    )
     questions = QuestionSerializer(many=True, write_only=True)
-    teacher = serializers.PrimaryKeyRelatedField(queryset=Teacher.objects.all(), required=False)
 
     class Meta:
         model = Exam
-        fields = ['id', 'title', 'subject', 'teacher', 'questions']
+        fields = ['id', 'title', 'subject', 'teacher', 'teacher_id', 'questions']
+
 
     def create(self, validated_data):
         questions_data = validated_data.pop('questions')

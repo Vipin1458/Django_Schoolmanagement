@@ -14,8 +14,16 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.decorators import parser_classes
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from rest_framework.views import APIView
+from django.conf import settings
 from django.utils import timezone
 from .models import Exam, Question, StudentExam, StudentAnswer
+from django.utils.http import urlsafe_base64_decode
 from .serializers import ExamSerializer,ExamSubmissionSerializer,StudentExamSerializer,QuestionSerializer
 from django.contrib.auth import get_user_model
 from datetime import datetime
@@ -305,11 +313,12 @@ class ExamViewSet(viewsets.ModelViewSet):
             raise PermissionError("Only teachers or admins can create exams.")
 
     def get_queryset(self):
+    
         user = self.request.user
-        if user.is_authenticated and user.role == 'teacher':
-            teacher = Teacher.objects.get(user=user)
-            return Exam.objects.filter(teacher=teacher)
-        return Exam.objects.all()
+        if user.is_authenticated and user.role in ['teacher', 'admin']:
+            return Exam.objects.all()
+        return Exam.objects.none()
+
 
     @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def questions(self, request, pk=None):
@@ -365,3 +374,43 @@ class StudentExamListView(generics.ListAPIView):
             queryset = queryset.filter(exam__id=exam_id)
 
         return queryset
+    
+
+class CustomPasswordResetView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        try:
+            user = User.objects.get(email=email)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_link = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+
+            send_mail(
+                subject="Reset your password",
+                message=f"Click the link to reset your password: {reset_link}",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            return Response({"message": "Reset link sent."}, status=200)
+        except User.DoesNotExist:
+            return Response({"error": "Email not found."}, status=404)
+        
+class CustomPasswordResetConfirmView(APIView):
+    def post(self, request, uidb64, token):
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User.objects.get(pk=uid)
+        except (User.DoesNotExist, ValueError):
+            return Response({"error": "Invalid UID."}, status=400)
+
+        if not default_token_generator.check_token(user, token):
+            return Response({"error": "Invalid or expired token."}, status=400)
+
+        new_password = request.data.get("password")
+        if not new_password:
+            return Response({"error": "Password is required."}, status=400)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"message": "Password has been reset."})

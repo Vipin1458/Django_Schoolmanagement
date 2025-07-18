@@ -21,6 +21,11 @@ class Teacher(models.Model):
     date_of_joining = models.DateField()
     status = models.IntegerField(default=0)  
 
+    def delete(self, *args, **kwargs):
+        user = self.user  # store user before deletion
+        super().delete(*args, **kwargs)
+        user.delete()     # now safely delete user
+
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.employee_id}"
 
@@ -34,6 +39,11 @@ class Student(models.Model):
     admission_date = models.DateField()
     status = models.IntegerField(default=0)  
     assigned_teacher = models.ForeignKey(Teacher, on_delete=models.SET_NULL, null=True)
+
+    def delete(self, *args, **kwargs):
+        user = self.user  
+        super().delete(*args, **kwargs)
+        user.delete()     
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.roll_number}"
