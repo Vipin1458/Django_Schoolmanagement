@@ -161,10 +161,10 @@ class StudentProfileUpdateSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source='user.first_name', required=False)
     last_name = serializers.CharField(source='user.last_name', required=False)
     email = serializers.EmailField(source='user.email', required=False)
-
+    status = serializers.BooleanField(required=False)
     class Meta:
         model = Student
-        fields = ['first_name', 'last_name', 'email', 'phone_number']
+        fields = ['first_name', 'last_name', 'email', 'phone_number','status']
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
@@ -397,7 +397,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uid           = serializers.CharField()
     token         = serializers.CharField()
-    new_password  = serializers.CharField(min_length=6)
+    new_password  = serializers.CharField(min_length=3)
 
     def validate(self, attrs):
         try:

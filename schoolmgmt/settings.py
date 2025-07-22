@@ -135,7 +135,7 @@ EMAIL_HOST_USER = 'vipininnovature@gmail.com'             # Replace with your Gm
 EMAIL_HOST_PASSWORD = 'yhcw qmbb tmyl lhve'    # Paste the app password
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 DEFAULT_FROM_EMAIL = "School App <no‑reply@schoolapp.com>"
-FRONTEND_RESET_URL = "http://localhost:5173/reset-password"
+FRONTEND_RESET_URL = "http://localhost:5173/reset-password/"
 
 
 

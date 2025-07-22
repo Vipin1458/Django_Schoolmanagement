@@ -2,8 +2,6 @@ from django.urls import path, include
 from django.contrib.auth import views as auth_views
 from rest_framework.routers import DefaultRouter
 from .views import (
-    # RegisterTeacherView,
-    # RegisterStudentView,
     TeacherViewSet,
     StudentViewSet,
     StudentByTeacherViewSet,
@@ -44,9 +42,9 @@ urlpatterns = [
     # path('api/student-marks/', StudentExamListView.as_view(), name='student-exam-marks'),
     # path('api/password-reset/', CustomPasswordResetView.as_view(), name='password_reset'),
     # path('api/password-reset-confirm/<uidb64>/<token>/', CustomPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
-     path('api/password-reset',           PasswordResetRequestView.as_view(),
+     path('api/password-reset/',           PasswordResetRequestView.as_view(),
          name='password-reset'),
-    path('password-reset/confirm',   PasswordResetConfirmView.as_view(),
+    path('password-reset/confirm/',   PasswordResetConfirmView.as_view(),
          name='password-reset-confirm'),
     path('', include(router.urls)),
 ]
