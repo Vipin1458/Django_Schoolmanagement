@@ -3,9 +3,9 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser  
 from rest_framework import status, viewsets, permissions, generics
 from .serializers import (
-    TeacherSerializer, StudentSerializer, ExamSerializer, 
+    TeacherSerializer, StudentSerializer, StudentProfileUpdateSerializer,ExamSerializer, 
     ExamSubmissionSerializer, StudentExamSerializer, QuestionSerializer,
-    TeacherSelfUpdateSerializer
+    TeacherSelfUpdateSerializer,PasswordResetRequestSerializer,PasswordResetConfirmSerializer
 )
 from .models import Teacher, Student, Exam, Question, StudentExam, StudentAnswer, User
 from django.db import models
@@ -18,11 +18,13 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import RetrieveUpdateAPIView
 from django.contrib.auth.tokens import default_token_generator
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 from django.conf import settings
 from datetime import datetime
+from rest_framework.generics import GenericAPIView
 import csv
 import io
 from django.http import HttpResponse
@@ -159,6 +161,42 @@ class StudentViewSet(viewsets.ModelViewSet):
         logger.warning(f"[{request.user.role.upper()}:{request.user.username}] Deleting student ID {student.id}")
         return super().destroy(request, *args, **kwargs)
 
+
+class StudentProfileUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+
+        if user.role != 'student':
+            return Response({'detail': 'Only students can update their profile.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            student = Student.objects.get(user=user)
+        except Student.DoesNotExist:
+            return Response({'detail': 'Student profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = StudentProfileUpdateSerializer(student, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_profile(request):
+    user = request.user
+    if user.role != 'student':
+        return Response({'detail': 'Not authorized'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        student = Student.objects.get(user=user)
+    except Student.DoesNotExist:
+        return Response({'detail': 'Student profile not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = StudentSerializer(student, context={'request': request})
+    return Response(serializer.data)
 
 class StudentByTeacherViewSet(viewsets.ModelViewSet):    
     serializer_class = StudentSerializer
@@ -437,7 +475,7 @@ def import_students_csv(request):
                     date_of_birth=datetime.strptime(row['date_of_birth'], '%Y-%m-%d').date(),
                     admission_date=datetime.strptime(row['admission_date'], '%Y-%m-%d').date(),
                     assigned_teacher_id=row.get('assigned_teacher_id') if row.get('assigned_teacher_id') else None,
-                    status=0
+                    status=1
                 )
 
                 created_count += 1
@@ -446,6 +484,7 @@ def import_students_csv(request):
                 errors.append(f"Row {row_num}: {str(e)}")
 
         if errors:
+            
             return Response({
                 "message": f"Imported {created_count} students with {len(errors)} errors.",
                 "errors": errors[:10]  
@@ -462,42 +501,77 @@ def import_students_csv(request):
 
 
 
-class CustomPasswordResetView(APIView):
-    def post(self, request):
-        email = request.data.get("email")
-        try:
-            user = User.objects.get(email=email)
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-            reset_link = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
+# class CustomPasswordResetView(APIView):
+#     def post(self, request):
+#         email = request.data.get("email")
+#         try:
+#             user = User.objects.get(email=email)
+#             uid = urlsafe_base64_encode(force_bytes(user.pk))
+#             token = default_token_generator.make_token(user)
+#             reset_link = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
 
-            send_mail(
-                subject="Reset your password",
-                message=f"Click the link to reset your password: {reset_link}",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                fail_silently=False,
-            )
-            return Response({"message": "Reset link sent."}, status=200)
-        except User.DoesNotExist:
-            return Response({"error": "Email not found."}, status=404)
+#             send_mail(
+#                 subject="Reset your password",
+#                 message=f"Click the link to reset your password: {reset_link}",
+#                 from_email=settings.DEFAULT_FROM_EMAIL,
+#                 recipient_list=[email],
+#                 fail_silently=False,
+#             )
+#             return Response({"message": "Reset link sent."}, status=200)
+#         except User.DoesNotExist:
+#             return Response({"error": "Email not found."}, status=404)
         
 
-class CustomPasswordResetConfirmView(APIView):
-    def post(self, request, uidb64, token):
-        try:
-            uid = urlsafe_base64_decode(uidb64).decode()
-            user = User.objects.get(pk=uid)
-        except (User.DoesNotExist, ValueError):
-            return Response({"error": "Invalid UID."}, status=400)
+# class CustomPasswordResetConfirmView(APIView):
+#     def post(self, request, uidb64, token):
+#         try:
+#             uid = urlsafe_base64_decode(uidb64).decode()
+#             user = User.objects.get(pk=uid)
+#         except (User.DoesNotExist, ValueError):
+#             return Response({"error": "Invalid UID."}, status=400)
 
-        if not default_token_generator.check_token(user, token):
-            return Response({"error": "Invalid or expired token."}, status=400)
+#         if not default_token_generator.check_token(user, token):
+#             return Response({"error": "Invalid or expired token."}, status=400)
 
-        new_password = request.data.get("password")
-        if not new_password:
-            return Response({"error": "Password is required."}, status=400)
+#         new_password = request.data.get("password")
+#         if not new_password:
+#             return Response({"error": "Password is required."}, status=400)
 
-        user.set_password(new_password)
-        user.save()
-        return Response({"message": "Password has been reset."})
+#         user.set_password(new_password)
+#         user.save()
+#         return Response({"message": "Password has been reset."})
+    
+class PasswordResetRequestView(GenericAPIView):
+
+    serializer_class = PasswordResetRequestSerializer
+    permission_classes = []
+
+    def post(self, request):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+
+        user = User.objects.get(email=ser.validated_data["email"])
+        token = PasswordResetTokenGenerator().make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        reset_url = f"{settings.FRONTEND_RESET_URL}?uid={uid}&token={token}"
+
+        send_mail(
+            "Password reset",
+            f"Use this link to reset your password:\n{reset_url}",
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+        )
+
+        return Response({"detail": "Password‑reset e‑mail sent."}, status=200)
+
+
+class PasswordResetConfirmView(GenericAPIView):
+
+    serializer_class = PasswordResetConfirmSerializer
+    permission_classes = []
+
+    def post(self, request):
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response({"detail": "Password has been reset."}, status=200)

@@ -134,6 +134,9 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'vipininnovature@gmail.com'             # Replace with your Gmail
 EMAIL_HOST_PASSWORD = 'yhcw qmbb tmyl lhve'    # Paste the app password
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = "School App <no‑reply@schoolapp.com>"
+FRONTEND_RESET_URL = "http://localhost:5173/reset-password"
+
 
 
 TEMPLATES = [
@@ -207,6 +210,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173"  
 ]
 CORS_ALLOW_CREDENTIALS = True
 

@@ -3,6 +3,11 @@ from django.contrib.auth.hashers import make_password
 from core.models import Exam, Question, Teacher
 from .models import User, Teacher, Student, StudentExam, StudentAnswer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
+
+
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -149,6 +154,33 @@ class StudentSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+
+
+class StudentProfileUpdateSerializer(serializers.ModelSerializer):
+    first_name = serializers.CharField(source='user.first_name', required=False)
+    last_name = serializers.CharField(source='user.last_name', required=False)
+    email = serializers.EmailField(source='user.email', required=False)
+
+    class Meta:
+        model = Student
+        fields = ['first_name', 'last_name', 'email', 'phone_number']
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', {})
+
+       
+        for attr, value in user_data.items():
+            setattr(instance.user, attr, value)
+        instance.user.save()
+
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        return instance
+
 
 
 class TeacherSelfUpdateSerializer(serializers.ModelSerializer):
@@ -352,3 +384,36 @@ class ExamSubmissionSerializer(serializers.Serializer):
         student_exam.marks = score
         student_exam.save()
         return student_exam
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("No user with this email.")
+        return value
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    uid           = serializers.CharField()
+    token         = serializers.CharField()
+    new_password  = serializers.CharField(min_length=6)
+
+    def validate(self, attrs):
+        try:
+            uid  = force_str(urlsafe_base64_decode(attrs["uid"]))
+            user = User.objects.get(pk=uid)
+        except (ValueError, User.DoesNotExist):
+            raise serializers.ValidationError("Invalid link")
+
+        if not PasswordResetTokenGenerator().check_token(user, attrs["token"]):
+            raise serializers.ValidationError("Invalid or expired token")
+
+        attrs["user"] = user
+        return attrs
+
+    def save(self):
+        user = self.validated_data["user"]
+        user.set_password(self.validated_data["new_password"])
+        user.save()
+        return user
