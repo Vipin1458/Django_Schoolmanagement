@@ -499,47 +499,6 @@ def import_students_csv(request):
             "error": f"Error processing CSV file: {str(e)}"
         }, status=status.HTTP_400_BAD_REQUEST)
 
-
-
-# class CustomPasswordResetView(APIView):
-#     def post(self, request):
-#         email = request.data.get("email")
-#         try:
-#             user = User.objects.get(email=email)
-#             uid = urlsafe_base64_encode(force_bytes(user.pk))
-#             token = default_token_generator.make_token(user)
-#             reset_link = f"{settings.FRONTEND_URL}/reset-password/{uid}/{token}/"
-
-#             send_mail(
-#                 subject="Reset your password",
-#                 message=f"Click the link to reset your password: {reset_link}",
-#                 from_email=settings.DEFAULT_FROM_EMAIL,
-#                 recipient_list=[email],
-#                 fail_silently=False,
-#             )
-#             return Response({"message": "Reset link sent."}, status=200)
-#         except User.DoesNotExist:
-#             return Response({"error": "Email not found."}, status=404)
-        
-
-# class CustomPasswordResetConfirmView(APIView):
-#     def post(self, request, uidb64, token):
-#         try:
-#             uid = urlsafe_base64_decode(uidb64).decode()
-#             user = User.objects.get(pk=uid)
-#         except (User.DoesNotExist, ValueError):
-#             return Response({"error": "Invalid UID."}, status=400)
-
-#         if not default_token_generator.check_token(user, token):
-#             return Response({"error": "Invalid or expired token."}, status=400)
-
-#         new_password = request.data.get("password")
-#         if not new_password:
-#             return Response({"error": "Password is required."}, status=400)
-
-#         user.set_password(new_password)
-#         user.save()
-#         return Response({"message": "Password has been reset."})
     
 class PasswordResetRequestView(GenericAPIView):
 
