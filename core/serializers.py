@@ -190,7 +190,7 @@ class TeacherSelfUpdateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Teacher
-        fields = ['first_name', 'last_name', 'email', 'phone_number']
+        fields = ['first_name', 'last_name', 'email', 'phone_number','status']
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})

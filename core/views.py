@@ -19,7 +19,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import RetrieveUpdateAPIView
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 from django.conf import settings
@@ -34,40 +34,40 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class CustomLoginView(APIView):
-    permission_classes = []
+# class CustomLoginView(APIView):
+#     permission_classes = []
 
-    def post(self, request):
-        username = request.data.get("username")
-        password = request.data.get("password")
+#     def post(self, request):
+#         username = request.data.get("username")
+#         password = request.data.get("password")
         
-        logger.info(f"Login attempt for username: {username}")
+#         logger.info(f"Login attempt for username: {username}")
         
-        if not username or not password:
-            return Response(
-                {"error": "Please provide both username and password."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+#         if not username or not password:
+#             return Response(
+#                 {"error": "Please provide both username and password."},
+#                 status=status.HTTP_400_BAD_REQUEST
+#             )
 
-        user = authenticate(username=username, password=password)
+#         user = authenticate(username=username, password=password)
 
-        if not user:
-            logger.error(f"Invalid login for username: {username}")
-            return Response(
-                {"error": "Invalid credentials."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+#         if not user:
+#             logger.error(f"Invalid login for username: {username}")
+#             return Response(
+#                 {"error": "Invalid credentials."},
+#                 status=status.HTTP_401_UNAUTHORIZED
+#             )
             
-        logger.info(f"Login successful for user: {user.username}")
-        token, created = Token.objects.get_or_create(user=user)
+#         logger.info(f"Login successful for user: {user.username}")
+#         token, created = Token.objects.get_or_create(user=user)
 
-        return Response({
-            "token": token.key,
-            "user_id": user.id,
-            "username": user.username,
-            "role": user.role,
-            "full_name": user.get_full_name()
-        }, status=status.HTTP_200_OK)
+#         return Response({
+#             "token": token.key,
+#             "user_id": user.id,
+#             "username": user.username,
+#             "role": user.role,
+#             "full_name": user.get_full_name()
+#         }, status=status.HTTP_200_OK)
 
 
 class TeacherViewSet(viewsets.ModelViewSet):
@@ -277,7 +277,7 @@ class ExamViewSet(viewsets.ModelViewSet):
                 models.Q(target_class=student_class) |  
                 models.Q(target_class=student_numeric_class)    
             )
-                # return Exam.objects.filter(target_class=student.class_name)
+
             except Student.DoesNotExist:
                 return Exam.objects.none()
            
@@ -329,7 +329,8 @@ class ExamViewSet(viewsets.ModelViewSet):
             "marks": submission.marks,
             "total": 5
         })
-
+        
+        
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def my_marks(self, request):
         if request.user.role != 'student':

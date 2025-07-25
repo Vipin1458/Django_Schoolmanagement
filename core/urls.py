@@ -5,7 +5,7 @@ from .views import (
     TeacherViewSet,
     StudentViewSet,
     StudentByTeacherViewSet,
-    CustomLoginView,
+    # CustomLoginView,
     AdminTeacherViewSet,
     TeacherSelfUpdateView,
     export_students_csv,
@@ -26,7 +26,7 @@ router.register(r'mystudents', StudentByTeacherViewSet, basename='teacher-studen
 router.register(r'teacher-admin', AdminTeacherViewSet, basename='admin-teacher')
 router.register(r'exams', ExamViewSet, basename='exam')
 urlpatterns = [
-    path('login', CustomLoginView.as_view(), name='custom_login'),
+    # path('login', CustomLoginView.as_view(), name='custom_login'),
     path('teacher/me', TeacherSelfUpdateView.as_view(), name='teacher_self_update'),
     path('export/students', export_students_csv, name='export_students_csv'),
     path('export/teachers', export_teachers_csv, name='export_teachers_csv'),
