@@ -1,7 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser  
-from rest_framework import status, viewsets, permissions, generics
+from rest_framework import status, viewsets, permissions, generics,filters
+from django_filters.rest_framework import DjangoFilterBackend
 from .serializers import (
     TeacherSerializer, StudentSerializer, StudentProfileUpdateSerializer,ExamSerializer, 
     ExamSubmissionSerializer, StudentExamSerializer, QuestionSerializer,
@@ -115,6 +116,9 @@ class TeacherViewSet(viewsets.ModelViewSet):
 class StudentViewSet(viewsets.ModelViewSet):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ['user__first_name', 'user__last_name', 'roll_number', 'class_name']
+    filterset_fields = ['class_name', 'status'] 
     permission_classes = [IsAuthenticated]
 
     def get_permissions(self):
