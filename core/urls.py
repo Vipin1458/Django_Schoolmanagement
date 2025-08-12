@@ -36,5 +36,6 @@ urlpatterns = [
     path('api/student/profile/update/', StudentProfileUpdateView.as_view(), name='student_profile_update'),
     path('api/password-reset/', PasswordResetRequestView.as_view(),name='password-reset'),
     path('password-reset/confirm/',PasswordResetConfirmView.as_view(),name='password-reset-confirm'),
+    path("chat/", include("chat.urls")), 
     path('', include(router.urls)),
 ]
