@@ -24,6 +24,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['user_id'] = self.user.id
         data['username'] = self.user.username
         data['role'] = self.user.role
+
+        if self.user.role == 'teacher':
+            teacher = Teacher.objects.filter(user=self.user).first()
+            if teacher:
+                data['id'] = teacher.id
+
+        # if self.user.role == 'admin':
+        #     teacher = Teacher.objects.filter(user=self.user).first()
+        #     if teacher:
+        #         data['id'] = teacher.id
+        if self.user.role == 'student':
+            student = Student.objects.filter(user=self.user).first()
+            if student:
+                data['id'] = student.id
+
         return data
 
 

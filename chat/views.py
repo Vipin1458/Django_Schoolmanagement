@@ -17,7 +17,6 @@ class ConversationViewSet(viewsets.GenericViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # return conversations where user is teacher or student participant
         from django.apps import apps
         Teacher = apps.get_model("core", "Teacher")
         Student = apps.get_model("core", "Student")
@@ -31,6 +30,7 @@ class ConversationViewSet(viewsets.GenericViewSet):
             qs = qs | Conversation.objects.filter(student=student_obj)
         if user.is_staff:
             qs = Conversation.objects.all()
+
         return qs.distinct().order_by("-updated_at")
 
     def list(self, request):
@@ -43,16 +43,55 @@ class ConversationViewSet(viewsets.GenericViewSet):
         return Response(serializer.data)
 
     def create(self, request):
-        serializer = ConversationCreateSerializer(data=request.data, context={"request": request})
+        from django.apps import apps
+        Teacher = apps.get_model("core", "Teacher")
+        Student = apps.get_model("core", "Student")
+
+        user = request.user
+        data = request.data.copy()
+
+        if hasattr(user, "student"):
+            student_obj = user.student
+            assigned_teacher = student_obj.assigned_teacher
+            if not assigned_teacher:
+                return Response(
+                    {"detail": "You do not have an assigned teacher."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            data["student_id"] = student_obj.id
+            data["teacher_id"] = assigned_teacher.id  
+
+        elif hasattr(user, "teacher"):
+            teacher_obj = user.teacher
+            data["teacher_id"] = teacher_obj.id
+            if not data.get("student_id"):
+                return Response(
+                    {"detail": "Student ID is required when creating a conversation as a teacher."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        elif user.is_staff:
+            if not data.get("teacher_id") or not data.get("student_id"):
+                return Response(
+                    {"detail": "Both teacher_id and student_id are required for admin."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        else:
+            return Response({"detail": "You are not allowed to create a conversation."}, status=403)
+
+        serializer = ConversationCreateSerializer(data=data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         conv = serializer.save()
         read_ser = ConversationSerializer(conv, context={"request": request})
         return Response(read_ser.data, status=status.HTTP_201_CREATED)
 
+
+
     @action(detail=True, methods=["get"], url_path="messages")
     def messages(self, request, pk=None):
         conv = get_object_or_404(Conversation, pk=pk)
-        # check participation
+
         user = request.user
         if not user.is_staff:
             is_participant = False
@@ -64,9 +103,5 @@ class ConversationViewSet(viewsets.GenericViewSet):
                 return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
         qs = conv.messages.all().order_by("created_at")
-        page = self.paginate_queryset(qs)
-        if page is not None:
-            serializer = MessageSerializer(page, many=True, context={"request": request})
-            return self.get_paginated_response(serializer.data)
         serializer = MessageSerializer(qs, many=True, context={"request": request})
-        return Response(serializer.data)
+        return Response({"results": serializer.data})
