@@ -1,7 +1,6 @@
 # chat/serializers.py
 from rest_framework import serializers
 from django.db import transaction
-
 from .models import Conversation, Message
 from django.conf import settings
 
@@ -30,7 +29,6 @@ class MessageSerializer(serializers.ModelSerializer):
         if not user:
             return None
         return getattr(user, "first_name", None) or getattr(user, "email", None) or str(user)
-
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -75,33 +73,19 @@ class ConversationSerializer(serializers.ModelSerializer):
         return MessageSerializer(last).data if last else None
 
 
-
 class ConversationCreateSerializer(serializers.Serializer):
-    teacher_id = serializers.IntegerField(required=False)
-    student_id = serializers.IntegerField(required=False)
+    teacher_id = serializers.IntegerField(required=True)
+    student_id = serializers.IntegerField(required=True)
 
     def validate(self, data):
-        user = self.context["request"].user
-        teacher_id = data.get("teacher_id")
-        student_id = data.get("student_id")
-
-        if not teacher_id and not student_id:
-            raise serializers.ValidationError("Provide teacher_id or student_id (one may be inferred from your account).")
-
         from django.apps import apps
         Teacher = apps.get_model("core", "Teacher")
         Student = apps.get_model("core", "Student")
 
-        if hasattr(user, "student") and not student_id:
-            student_obj = getattr(user, "student")
-            student_id = getattr(student_obj, "id")
-            data["student_id"] = student_id
+        teacher_id = data.get("teacher_id")
+        student_id = data.get("student_id")
 
-        if hasattr(user, "teacher") and not teacher_id:
-            teacher_obj = getattr(user, "teacher")
-            teacher_id = getattr(teacher_obj, "id")
-            data["teacher_id"] = teacher_id
-
+        # Validate IDs exist
         try:
             teacher = Teacher.objects.get(id=teacher_id)
         except Teacher.DoesNotExist:
@@ -112,19 +96,6 @@ class ConversationCreateSerializer(serializers.Serializer):
         except Student.DoesNotExist:
             raise serializers.ValidationError({"student_id": "Invalid student_id."})
 
-  
-        if not user.is_staff:
-            if hasattr(user, "student"):
-                my_student = getattr(user, "student")
-                assigned_teacher = getattr(my_student, "teacher", None)
-                if not assigned_teacher or assigned_teacher.id != teacher.id:
-                    raise serializers.ValidationError("You may only start a conversation with your assigned teacher.")
-            elif hasattr(user, "teacher"):
-                my_teacher = getattr(user, "teacher")
-                if not Student.objects.filter(id=student.id, teacher=my_teacher).exists():
-                    raise serializers.ValidationError("You may only start conversations with students assigned to you.")
-            else:
-                raise serializers.ValidationError("Only teachers or students may create conversations.")
         data["_teacher_obj"] = teacher
         data["_student_obj"] = student
         return data
@@ -134,5 +105,7 @@ class ConversationCreateSerializer(serializers.Serializer):
         student = validated_data["_student_obj"]
         user = self.context["request"].user
 
-        conv, created = Conversation.objects.get_or_create(teacher=teacher, student=student, defaults={"created_by": user})
+        conv, created = Conversation.objects.get_or_create(
+            teacher=teacher, student=student, defaults={"created_by": user}
+        )
         return conv
