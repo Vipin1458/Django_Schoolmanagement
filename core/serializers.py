@@ -119,13 +119,17 @@ class StudentSerializer(serializers.ModelSerializer):
         source='assigned_teacher.user.get_full_name', 
         read_only=True
     )
-
+    assigned_teacher_status = serializers.CharField(
+        source='assigned_teacher.status', 
+        read_only=True
+    )
+   
     class Meta:
         model = Student
         fields = [
             'id', 'user', 'roll_number', 'phone_number', 'grade', 
             'class_name', 'date_of_birth', 'admission_date', 'status', 
-            'assigned_teacher', 'assigned_teacher_name'
+            'assigned_teacher', 'assigned_teacher_name','assigned_teacher_status'
         ]
 
     def create(self, validated_data):
