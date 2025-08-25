@@ -67,6 +67,14 @@ class ConversationViewSet(viewsets.GenericViewSet):
             if not is_participant:
                 return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        qs = conv.messages.all().order_by("created_at")
-        serializer = MessageSerializer(qs, many=True, context={"request": request})
-        return Response({"results": serializer.data})
+        qs = conv.messages.all().order_by("-created_at")
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = MessageSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = MessageSerializer(qs, many=True)
+        return Response(serializer.data)
+    
+
+
+    
